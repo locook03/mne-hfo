@@ -40,7 +40,7 @@ def plot_hfo_event(raw, annotations, eventId):
 
     ch_mins = np.min(subset, axis=1)
     ch_maxs = np.max(subset, axis=1)
-    
+
     fig, axs = plt.subplots(subset.shape[0],1, sharex='col', gridspec_kw={'hspace': 0})
     # if type(axs) != list:
     #     axs = [axs]
@@ -63,6 +63,7 @@ def plot_hfo_event(raw, annotations, eventId):
 
 def plot_corr_matrix(corr_matrix: np.ndarray,
                      det_list: list,
+                     fig = None,
                      ax = None):
     """
     Compares similarity between detector results.
@@ -79,17 +80,22 @@ def plot_corr_matrix(corr_matrix: np.ndarray,
     det_list : List
         A list containing all Detector instances. Detectors should already be fit to the
         data.
+    fig : matplotlib.figure.Figure (optional)
+        The figure to plot the chart.
     ax : matplotlib.axes.Axes (optional)
-        The axes to which to plot the chart. If no ax given, it will use the current axis.
+        The axes to which to plot the chart. If no ax given, it will create a new figure.
 
     Returns
     -------
     ax : matplotlib.axes.Axes
-        Axes object with comparison chart plotted
+        Axes object with comparison chart plotted.
+    fig : matplotlib.figure.Figure
+        Figure object with comparison chart plotted.
     """
 
-    # If no axis is provided, the current axis will be used,
-    if ax == None:
+    # If no axis is provided, the figure will be created
+    if ax is None:
+        fig, ax = plt.subplots()
         ax = plt.gca()
 
     # Creates image using correlation matrix
@@ -114,5 +120,4 @@ def plot_corr_matrix(corr_matrix: np.ndarray,
     cbar.ax.set_ylabel("Similarity", rotation=-90, va="bottom")
     ax.set_title("Detector Comparison")
 
-    ax.plot()
-    return ax
+    return fig, ax
