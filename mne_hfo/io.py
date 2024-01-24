@@ -83,7 +83,7 @@ def create_annotations_df(
     if not isinstance(sfreq, list):
         sfreq = [sfreq] * len(onset)
 
-    sample = np.multiply(onset, sfreq).astype(int)
+    sample = np.rint(np.multiply(onset, sfreq)).astype(int)
 
     # set annotation labels
     if annotation_label is None:
