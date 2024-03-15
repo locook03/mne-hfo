@@ -8,7 +8,7 @@ import numpy as np
 import pandas
 import pandas as pd
 from mne.utils import run_subprocess
-from mne_bids import read_raw_bids, get_bids_path_from_fname, BIDSPath
+from mne_bids import read_raw_bids, get_bids_path_from_fname
 
 from .config import ANNOT_COLUMNS
 
@@ -228,7 +228,7 @@ def write_annotations(
     intended_for_path = get_bids_path_from_fname(intended_for)
     # write the correct extension for BrainVision
     if intended_for_path.extension == '.eeg':
-        intended_for_path.update(extension = '.vhdr')
+        intended_for_path.update(extension='.vhdr')
 
     if not intended_for_path.fpath.exists():
         raise RuntimeError(

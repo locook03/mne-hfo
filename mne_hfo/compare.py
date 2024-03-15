@@ -3,15 +3,14 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from sklearn.metrics import mutual_info_score, cohen_kappa_score
-from sklearn.preprocessing import Normalizer, MinMaxScaler
 
 from .posthoc import match_detected_annotations
 
 implemented_labeling = ["raw-detections", "simple-binning", "overlap-predictions"]
 implemented_comparisons = ["cohen-kappa", "mutual-info", "similarity-ratio"]
 
-def correlation_matrix(det_list: list,
-                        **comp_kw):
+
+def correlation_matrix(det_list: list, **comp_kw):
     """
     Generates a correlation matrix of detectors using values called from compare_detectors()
     using arguments pass in comp_kw. See compare_detectors() for more details about the
@@ -36,18 +35,20 @@ def correlation_matrix(det_list: list,
     comparison_values = []
     for i in det_list:
         for j in det_list:
-            if i==j:
+            if i == j:
                 comparison_values.append(1.0)
             else:
                 ch_vals = compare_detectors(i, j, **comp_kw)
-                comparison_values.append(np.mean([val for val in list(ch_vals.values()) if not math.isnan(val)]))
+                comparison_values.append(
+                    np.mean([val for val in list(ch_vals.values()) if not math.isnan(val)])
+                )
 
     comparison_matrix = np.reshape(comparison_values, chart_size)
     comparison_matrix[np.triu_indices(comparison_matrix.shape[0], 1)] = np.nan
     return comparison_matrix
 
-def compare_detectors(clf_1, clf_2, 
-                      **kwargs):
+
+def compare_detectors(clf_1, clf_2, **kwargs):
     """
     Compare fits for two classifiers per channel.
 
@@ -83,7 +84,7 @@ def compare_detectors(clf_1, clf_2,
         comp_method = kwargs['comp_method']
     else:
         comp_method = 'mutual-info'
-    
+
     if 'bin_width' in kwargs:
         bin_width = kwargs['bin_width']
     else:
@@ -97,13 +98,13 @@ def compare_detectors(clf_1, clf_2,
         raise RuntimeError("clf_1 must be fit to data before using compare")
     if not hasattr(clf_2, 'n_times'):
         raise RuntimeError("clf_2 must be fit to data before using compare")
-    
-    #Ensure the classifiers are using data with the same length
+
+    # Ensure the classifiers are using data with the same length
     if clf_1.n_times == clf_2.n_times:
         data_len = clf_1.n_times
     else:
         raise RuntimeError("clf_1 and clf_2 must be fit on the same length of data")
-    
+
     if label_method == 'raw-detections':
         label = _raw_detections
         label_kwargs = {'data_len' : data_len}
@@ -128,7 +129,7 @@ def compare_detectors(clf_1, clf_2,
         raise NotImplementedError(f"Comp Method must be one of "
                                   f"{', '.join(implemented_comparisons)}. You"
                                   f"passed {comp_method}.")
-        
+
     # Get the detection dataframes
     df1 = clf_1.to_data_frame(format="bids")
     df2 = clf_2.to_data_frame(format="bids")
@@ -136,11 +137,11 @@ def compare_detectors(clf_1, clf_2,
     ch_names = clf_1.ch_names
 
     df1_labels, df2_labels = label(df1, df2, ch_names, **label_kwargs)
-    
+
     ch_compares = comp(df1_labels, df2_labels, ch_names)
 
     return ch_compares
-    
+
 
 def _raw_detections(df1, df2, ch_names, data_len):
     """
@@ -151,7 +152,7 @@ def _raw_detections(df1, df2, ch_names, data_len):
 
     Parameters
     ----------
-    df1: Pd Dataframe 
+    df1: Pd Dataframe
         Dataframe that contains detection information for each channel.
     df2: Pd Dataframe
         Dataframe that contains detection information for each channel.
@@ -167,9 +168,9 @@ def _raw_detections(df1, df2, ch_names, data_len):
     df2_labels: Dict
         Map of channel name to list of labeled values for dataframe 2.
     """
-    label_kwargs = {'data_len' : data_len,
-                        'bin_width' : 1}
+    label_kwargs = {'data_len' : data_len, 'bin_width' : 1}
     return _simple_binning(df1, df2, ch_names, **label_kwargs)
+
 
 def _simple_binning(df1, df2, ch_names, data_len, bin_width):
     """
@@ -181,7 +182,7 @@ def _simple_binning(df1, df2, ch_names, data_len, bin_width):
 
     Parameters
     ----------
-    df1: Pd Dataframe 
+    df1: Pd Dataframe
         Dataframe that contains detection information for each channel.
     df2: Pd Dataframe
         Dataframe that contains detection information for each channel.
@@ -219,14 +220,24 @@ def _simple_binning(df1, df2, ch_names, data_len, bin_width):
         else:
             df2_indices = []
 
-        ## Creates list of sets showing detection start and stop sample times {start_time, stop_time}
-        df1_det_intervals = [{df1_channel.at[i, 'sample'], int(df1_channel.at[i, 'sample'] + df1_channel.at[i, 'duration'] * df1_channel.at[i, 'sfreq'])} for i in df1_indices]
-        df2_det_intervals = [{df2_channel.at[i, 'sample'], int(df2_channel.at[i, 'sample'] + df2_channel.at[i, 'duration'] * df2_channel.at[i, 'sfreq'])} for i in df2_indices]
+        # Creates list of sets showing detection start and stop sample times {start_time, stop_time}
+        df1_det_intervals = [
+            {
+                df1_channel.at[i, 'sample'],
+                int(df1_channel.at[i, 'sample'] +
+                    df1_channel.at[i, 'duration'] * df1_channel.at[i, 'sfreq'])
+            } for i in df1_indices]
+        df2_det_intervals = [
+            {
+                df2_channel.at[i, 'sample'],
+                int(df2_channel.at[i, 'sample'] +
+                    df2_channel.at[i, 'duration'] * df2_channel.at[i, 'sfreq'])
+            } for i in df2_indices]
 
         df1_label = np.zeros(data_len)
         df2_label = np.zeros(data_len)
 
-        ## Creates label array where detections are labeled as 1. Non times are labeled 0.
+        # Creates label array where detections are labeled as 1. Non times are labeled 0.
         for start, stop in df1_det_intervals:
             temp_interval = np.zeros_like(df1_label)
             temp_interval[start:stop] = 1
@@ -237,15 +248,15 @@ def _simple_binning(df1, df2, ch_names, data_len, bin_width):
             temp_interval[start:stop] = 1
             df2_label = np.add(df2_label, temp_interval)
 
-        ## If array cannot be properly split into bins, add nondetections to adjust size
+        # If array cannot be properly split into bins, add nondetections to adjust size
         rem = data_len % bin_width
         num_bins = data_len // bin_width
         if rem != 0:
             df1_label = np.append(df1_label, ([0] * (bin_width - rem)))
             df2_label = np.append(df2_label, ([0] * (bin_width - rem)))
             num_bins += 1
-        
-        ## If any detection is in a bin, the bin becomes 'true'
+
+        # If any detection is in a bin, the bin becomes 'true'
         df1_label = np.reshape(df1_label, (num_bins, bin_width)).any(axis=1)
         df2_label = np.reshape(df2_label, (num_bins, bin_width)).any(axis=1)
 
@@ -253,6 +264,7 @@ def _simple_binning(df1, df2, ch_names, data_len, bin_width):
         df2_labels[ch] = df2_label
 
     return df1_labels, df2_labels
+
 
 def _overlap_predictions(df1, df2, ch_names, **kwargs):
     """
@@ -265,7 +277,7 @@ def _overlap_predictions(df1, df2, ch_names, **kwargs):
 
     Parameters
     ----------
-    df1: Pd Dataframe 
+    df1: Pd Dataframe
         Dataframe that contains detection information for each channel.
     df2: Pd Dataframe
         Dataframe that contains detection information for each channel.
@@ -325,6 +337,7 @@ def _overlap_predictions(df1, df2, ch_names, **kwargs):
 
     return df1_labels, df2_labels
 
+
 def _mutual_info(lab1, lab2, ch_names):
     """Call sklearn's mutual info function."""
 
@@ -332,7 +345,7 @@ def _mutual_info(lab1, lab2, ch_names):
     for ch in ch_names:
         try:
             res = mutual_info_score(lab1[ch], lab2[ch])
-        except(ValueError):
+        except (ValueError):
             res = np.NAN
 
         ch_compares[ch] = res
@@ -347,22 +360,24 @@ def _cohen_kappa(lab1, lab2, ch_names):
     for ch in ch_names:
         try:
             res = cohen_kappa_score(lab1[ch], lab2[ch])
-        except(ValueError):
+        except (ValueError):
             res = np.NAN
 
         ch_compares[ch] = res
 
     return ch_compares
 
+
 def _similarity_ratio(lab1, lab2, ch_names):
     """"""
     ch_compares = {}
     for ch in ch_names:
         matching = lab1[ch] == lab2[ch]
-        ratio = np.sum(matching)/matching.shape[0]
+        ratio = np.sum(matching) / matching.shape[0]
         ch_compares[ch] = ratio
 
     return ch_compares
+
 
 def compare_chs_plot(det, raw, channels=[], save_file=False):
     if channels == []:
@@ -376,17 +391,17 @@ def compare_chs_plot(det, raw, channels=[], save_file=False):
     data = raw.get_data()
 
     for n, ch in enumerate(channels):
-        if ch not in det.ch_names: ## Not a valid channel
+        if ch not in det.ch_names:  # Not a valid channel
             raise ValueError(f"Channel '{ch}' is not"
                              f"found in raw data.")
-        
+
         ch_idx = det.ch_names.index(ch)
 
         axs[n].plot(range(0, sig_len), data[ch_idx])
         axs[n].set_ylabel(f"{ch}")
         axs[n].set_yticklabels([])
 
-        if ch in df.channels.values: ## Detections found in channel
+        if ch in df.channels.values:  # Detections found in channel
             df_channel = df_g.get_group(ch)
             df_indices = list(df_channel.index.values)
             for i in df_indices:
@@ -404,10 +419,11 @@ def compare_chs_plot(det, raw, channels=[], save_file=False):
 
     plt.show()
 
+
 def compare_detectors_ch_plot(det1, det2, raw, channels=[], save_file=False):
     if channels == []:
         channels = det1.ch_names
-    
+
     df1 = det1.to_data_frame(format="bids")
     df2 = det2.to_data_frame(format="bids")
     df1_g = df1.groupby('channels')
@@ -421,7 +437,7 @@ def compare_detectors_ch_plot(det1, det2, raw, channels=[], save_file=False):
         if ch not in det1.ch_names or ch not in det2.ch_names:
             raise ValueError(f"Channel '{ch}' is not"
                              f"found in raw data.")
-        
+
         ch_idx = det1.ch_names.index(ch)
 
         axs[n].plot(range(0, sig_len), data[ch_idx])
@@ -430,7 +446,7 @@ def compare_detectors_ch_plot(det1, det2, raw, channels=[], save_file=False):
         axs[n].set_yticklabels([])
         axs[n].set_yticklabels([])
 
-        if ch in df1.channels.values: ## Detections found in detector 1 channel
+        if ch in df1.channels.values:  # Detections found in detector 1 channel
             df_channel = df1_g.get_group(ch)
             df_indices = list(df_channel.index.values)
             for i in df_indices:
@@ -441,7 +457,7 @@ def compare_detectors_ch_plot(det1, det2, raw, channels=[], save_file=False):
 
                 axs[n].axvspan(start_sample, end_sample, color='red', alpha=0.5)
 
-        if ch in df2.channels.values: ## Detections found in detector 2 channel
+        if ch in df2.channels.values:  # Detections found in detector 2 channel
             df_channel = df2_g.get_group(ch)
             df_indices = list(df_channel.index.values)
             for i in df_indices:
@@ -451,7 +467,7 @@ def compare_detectors_ch_plot(det1, det2, raw, channels=[], save_file=False):
                 end_sample = start_sample + duration
 
                 axs[n].axvspan(start_sample, end_sample, color='blue', alpha=0.5)
-    
+
     if save_file:
         fig.set_figheight(2 * len(channels))
         det1_name = det1.__class__.__name__.replace("Detector", "")

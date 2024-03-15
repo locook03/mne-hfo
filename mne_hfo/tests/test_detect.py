@@ -37,8 +37,7 @@ def test_sklearn_compat(estimator, check):
         check(estimator)
     except ValueError as e:
         if 'Got data matrix with' in str(e):
-            pytest.skip(reason='Skipping sklearn tests with short '
-                            'number of features')
+            pytest.skip(reason='Skipping sklearn tests with short number of features')
         else:
             raise e
 

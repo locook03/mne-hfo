@@ -203,6 +203,7 @@ def _join_times(df: pd.DataFrame) -> pd.DataFrame:
 
     return res
 
+
 def _join_times_channels(df: pd.DataFrame) -> pd.DataFrame:
     """Join together start and end times sorted in order.
 
@@ -274,6 +275,7 @@ def _join_times_channels(df: pd.DataFrame) -> pd.DataFrame:
 
     return res
 
+
 def merge_overlapping_events(df: pd.DataFrame):
     """Merge overlapping events detected.
 
@@ -339,14 +341,13 @@ def merge_overlapping_events(df: pd.DataFrame):
 
     return merged_df
 
+
 def merge_channel_events(df: pd.DataFrame):
     """Merge overlapping events across channels
 
     Parameters
-    
-    """
 
-    orig_cols = df.columns
+    """
 
     # check dataframe
     df = _check_df(df, df_type="annotations")
@@ -389,6 +390,7 @@ def merge_channel_events(df: pd.DataFrame):
     )
 
     return merged_df
+
 
 def find_coincident_events(hfo_dict1, hfo_dict2):
     """

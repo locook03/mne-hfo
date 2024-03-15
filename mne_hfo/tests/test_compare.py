@@ -3,9 +3,9 @@ from numpy.testing import assert_almost_equal
 
 from mne import Annotations
 
-from mne_hfo import create_annotations_df
 from mne_hfo.compare import compare_detectors
 from mne_hfo.detect import RMSDetector
+
 
 @pytest.fixture(scope='function')
 def create_detector1():
@@ -23,7 +23,7 @@ def create_detector1():
 
     hfo_annotations = []
     description = ['hfo'] * len(onset1)
-    ch_names = [['A1'] for _ in range (len(onset1))]
+    ch_names = [['A1'] for _ in range(len(onset1))]
     ch_hfo_events = Annotations(onset=onset1, duration=duration1,
                                 description=description,
                                 ch_names=ch_names)
@@ -33,9 +33,10 @@ def create_detector1():
     rms1.ch_names = ['A1']
 
     # Gives dummy detector a length of the data used.
-    rms1.n_times = 200*1000
+    rms1.n_times = 200 * 1000
 
     return rms1
+
 
 @pytest.fixture(scope='function')
 def create_detector2():
@@ -54,7 +55,7 @@ def create_detector2():
 
     hfo_annotations = []
     description = ['hfo'] * len(onset2)
-    ch_names = [['A1'] for _ in range (len(onset2))]
+    ch_names = [['A1'] for _ in range(len(onset2))]
     ch_hfo_events = Annotations(onset=onset2, duration=duration2,
                                 description=description,
                                 ch_names=ch_names)
@@ -64,9 +65,10 @@ def create_detector2():
     rms2.ch_names = ['A1']
 
     # Gives dummy detector a length of the data used.
-    rms2.n_times = 200*1000
+    rms2.n_times = 200 * 1000
 
     return rms2
+
 
 def test_compare_detectors():
     """Test comparison metrics."""
@@ -100,7 +102,7 @@ def test_compare_detectors():
 
     hfo_annotations = []
     description = ['hfo'] * len(onset1)
-    ch_names = [['A1'] for _ in range (len(onset1))]
+    ch_names = [['A1'] for _ in range(len(onset1))]
     ch_hfo_events = Annotations(onset=onset1, duration=duration1,
                                 description=description,
                                 ch_names=ch_names)
@@ -123,7 +125,7 @@ def test_compare_detectors():
 
     hfo_annotations = []
     description = ['hfo'] * len(onset2)
-    ch_names = [['A1'] for _ in range (len(onset2))]
+    ch_names = [['A1'] for _ in range(len(onset2))]
     ch_hfo_events = Annotations(onset=onset2, duration=duration2,
                                 description=description,
                                 ch_names=ch_names)
@@ -133,15 +135,15 @@ def test_compare_detectors():
     rms2.ch_names = ['A1']
 
     # Gives dummy detector a length of the data used.
-    rms1.n_times = 200*1000
+    rms1.n_times = 200 * 1000
 
     with pytest.raises(RuntimeError, match='clf_2 must be fit'
                        ' to data before using compare'):
         compare_detectors(rms1, rms2,
                           comp_method="mutual-info",
                           label_method="overlap-predictions")
-        
-    rms2.n_times = 100*1000
+
+    rms2.n_times = 100 * 1000
 
     # Make sure the length of the raw data for each classifier are identical
     with pytest.raises(RuntimeError, match='clf_1 and clf_2 must be fit'
@@ -149,8 +151,9 @@ def test_compare_detectors():
         compare_detectors(rms1, rms2,
                           comp_method="mutual-info",
                           label_method="overlap-predictions")
-        
-    rms2.n_times = 200*1000
+
+    rms2.n_times = 200 * 1000
+
 
 def test_comparison_methods(create_detector1, create_detector2):
     det1 = create_detector1
@@ -167,23 +170,28 @@ def test_comparison_methods(create_detector1, create_detector2):
     expected_similarity = 0.28571429
 
     # Calculate mutual info and assert almost equal
-    mutual_info = compare_detectors(det1, det2, label_method="overlap-predictions", comp_method="mutual-info")
+    mutual_info = compare_detectors(det1, det2,
+                                    label_method="overlap-predictions",
+                                    comp_method="mutual-info")
     mi = mutual_info['A1']
     assert_almost_equal(mi, expected_mutual_info, decimal=5)
 
     # Calculate kappa score and assert almost equal
-    kappa = compare_detectors(det1, det2, label_method="overlap-predictions", comp_method="cohen-kappa")
+    kappa = compare_detectors(det1, det2,
+                              label_method="overlap-predictions",
+                              comp_method="cohen-kappa")
     k = kappa['A1']
     assert_almost_equal(k, expected_kappa_score, decimal=5)
 
-    similarity = compare_detectors(det1, det2, label_method="overlap-predictions", comp_method="similarity-ratio")
+    similarity = compare_detectors(det1, det2,
+                                   label_method="overlap-predictions",
+                                   comp_method="similarity-ratio")
     s = similarity['A1']
     assert_almost_equal(s, expected_similarity, decimal=5)
 
     # Make sure you can't run a random method
     with pytest.raises(NotImplementedError):
         compare_detectors(det1, det2, label_method="overlap=predictions", comp_method="average")
-
 
 
 def test_labeling_methods(create_detector1, create_detector2):
