@@ -35,6 +35,7 @@ rms_detector = RMSDetector(**kwargs)
 rms_detector.fit(X=raw)
 # annots = rms_detector.to_data_frame(format="bids")
 annots = rms_detector.hfo_annotations
-plot_hfo_event(raw, annots, 0)
-plt.show()
+for i in range(0,36):
+    plot_hfo_event(raw, rms_detector, i)
+    plt.savefig(f"/home/logan/nspm/hfo_figures/Event{i}.jpg")
 #plot_hfos(raw, annots)

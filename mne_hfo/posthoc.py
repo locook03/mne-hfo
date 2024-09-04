@@ -205,7 +205,8 @@ def _join_times(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def _join_times_channels(df: pd.DataFrame) -> pd.DataFrame:
-    """Join together start and end times sorted in order.
+    """Join together start and end times, combining detection events across the
+    groups.
 
     Creates a second column ``what`` that marks +1/-1 for start/end times
     to keep track of how many intervals are overlapping. Then a ``newwin``
@@ -260,6 +261,7 @@ def _join_times_channels(df: pd.DataFrame) -> pd.DataFrame:
     # agg_func_dict = {col: lambda x: set(x) for col in df.columns}
     res = (
         df.reset_index(names="orig_indices")
+        .sort_values("channels")
         .groupby("group")
         .agg(
             {
@@ -343,7 +345,7 @@ def merge_overlapping_events(df: pd.DataFrame):
 
 
 def merge_channel_events(df: pd.DataFrame):
-    """Merge overlapping events across channels
+    """Merge overlapping events across same-electrode channels
 
     Parameters
 
@@ -364,10 +366,13 @@ def merge_channel_events(df: pd.DataFrame):
     df["end_timestamp"] = df["start_timestamp"] + duration_secs
     df["ref_timestamp"] = ref_timestamp
 
+    # create electrode name in df
+    df["electrode"] = df['channels'].replace('\d+', '', regex=True)
+
     # first group by channels
     # now join rows that are overlapping
     merged_df = (
-        df.groupby(["label"])
+        df.groupby(["electrode"])
         .apply(_join_times_channels)  # type: ignore
         .reset_index(drop=True)
     )

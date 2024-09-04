@@ -1,12 +1,12 @@
 import mne
 import numpy as np
-import pandas as pd
 import matplotlib.pyplot as plt
-from mne_hfo import merge_channel_events, merge_overlapping_events
+from mne_hfo import merge_channel_events
 from mne_hfo.io import create_annotations_df
 
 
-def plot_hfo_event(raw, annotations, eventId):
+def plot_hfo_event(raw, detector, eventId, show_filtered=False):
+    annotations = detector.hfo_annotations
     mne.viz.set_browser_backend("qt")
 
     # convert annotations to annotations dataframe
@@ -16,55 +16,83 @@ def plot_hfo_event(raw, annotations, eventId):
     sfreq = raw.info["sfreq"]
 
     # each annotation only has one channel associated with it
-    ch_names = [ch[0] for ch in annotations.ch_names]
+    annot_ch_names = [ch[0] for ch in annotations.ch_names]
 
     # create an annotations dataframe
     annotations_df = create_annotations_df(
-        onset, duration, ch_names, annotation_label=label, sfreq=sfreq
+        onset, duration, annot_ch_names, annotation_label=label, sfreq=sfreq
     )
-    merged = merge_channel_events(annotations_df)
+    annotations.description = [f"hfo_{ch}" for ch in annot_ch_names]
+    raw.set_annotations(annotations)
+
+    merged = merge_channel_events(annotations_df).sort_values("onset")
     print(f"Number of events: {merged.shape[0]}")
 
     event = merged.iloc[eventId]
     onset = event["onset"]
     duration = event["duration"]
-    channels = event["channels"]
+    event_channels = event["channels"]
+    electrode = ''.join([c for c in event["channels"][0] if not c.isdigit()])
     orig_indices = event["orig_indices"]
-    t=np.arange(onset, onset+duration, 1/sfreq)
-    
-    annotations.description = [f"hfo_{ch}" for ch in ch_names]
 
-    raw.set_annotations(annotations)
-    ch_indices = [ch_names.index(i) for i in channels]
-    subset = raw.get_data(tmin=onset, tmax=onset+duration, picks=ch_indices)
+    t_start = max(0, onset - 1)
+    t_end = min(raw.tmax, onset + duration + 1)
 
-    ch_mins = np.min(subset, axis=1)
-    ch_maxs = np.max(subset, axis=1)
+    # include non event channels
+    electrode_channels = [
+        ch for ch in raw.ch_names if ''.join([c for c in ch if not c.isdigit()]) == electrode
+    ]
+    subset = raw.get_data(tmin=t_start, tmax=t_end, picks=electrode_channels)
+    t = np.linspace(t_start, t_end, num=subset.shape[1])
 
-    fig, axs = plt.subplots(subset.shape[0],1, sharex='col', gridspec_kw={'hspace': 0})
-    # if type(axs) != list:
-    #     axs = [axs]
-    for i, ax in enumerate(axs):
-        ch = ch_names[ch_indices[i]]
-        ax.plot(t,subset[i])
-        ax.set_ylabel(ch, rotation=20, labelpad=20)
+    fig, axs = plt.subplots(subset.shape[0], 2, sharex='col', gridspec_kw={'hspace': 0})
+    if not isinstance(axs, (list, tuple, np.ndarray)):
+        axs = [axs]
+    for i, ax in enumerate(axs[:, 0]):
+        electrode_ch = electrode_channels[i]
+        ax.plot(t, subset[i])
+        ax.set_ylabel(electrode_ch, rotation=20, labelpad=20)
         ax.set_yticks([])
         ax.set_xlabel("Time (s)")
 
-        for j in orig_indices:
-            orig_event = annotations_df.iloc[j]
-            if orig_event.channels == ch:
-                orig_onset = orig_event.onset
-                orig_duration = orig_event.duration
-                t_event = np.arange(orig_onset, orig_onset+orig_duration, 1/sfreq)
-                ax.fill_between(t_event, ch_mins[i], ch_maxs[i], facecolor='red', alpha=0.5)
-    fig.suptitle(f"Detections comprising Event {eventId}")
+        if electrode_ch in event_channels:
+            ch_index = event_channels.index(electrode_ch)
+            orig_index = orig_indices[ch_index]
+            orig_event = annotations_df.iloc[orig_index]
+            orig_onset = orig_event.onset
+            orig_duration = orig_event.duration
+            ax.axvspan(orig_onset, orig_onset + orig_duration, facecolor='red', alpha=0.5)
+
+    subset_filtered = mne.filter.filter_data(
+        subset,
+        sfreq=sfreq,
+        l_freq=detector.l_freq,
+        h_freq=detector.h_freq,
+        method="fir",
+        verbose=False,
+    )
+    for i, ax in enumerate(axs[:, 1]):
+        electrode_ch = electrode_channels[i]
+        ax.plot(t, subset_filtered[i])
+        ax.set_ylabel(electrode_ch, rotation=20, labelpad=20)
+        ax.set_yticks([])
+        ax.set_xlabel("Time (s)")
+
+        if electrode_ch in event_channels:
+            ch_index = event_channels.index(electrode_ch)
+            orig_index = orig_indices[ch_index]
+            orig_event = annotations_df.iloc[orig_index]
+            orig_onset = orig_event.onset
+            orig_duration = orig_event.duration
+            ax.axvspan(orig_onset, orig_onset + orig_duration, facecolor='red', alpha=0.5)
+
+    axs[0, 0].set_title("Raw")
+    axs[0, 1].set_title("Filtered")
+    fig.suptitle(f"Event {eventId} Detections")
     return fig, axs
 
-def plot_corr_matrix(corr_matrix: np.ndarray,
-                     det_list: list,
-                     fig = None,
-                     ax = None):
+
+def plot_corr_matrix(corr_matrix: np.ndarray, det_list: list, fig=None, ax=None):
     """
     Compares similarity between detector results.
     Creates a plot of the comparison values in a len(det_list) x len(det_list) plot.
@@ -75,7 +103,7 @@ def plot_corr_matrix(corr_matrix: np.ndarray,
     Parameters
     ----------
     corr_matrix : np.ndarray
-        A numpy 2D matrix with all the comparison values for each detector listed in 
+        A numpy 2D matrix with all the comparison values for each detector listed in
         det_list.
     det_list : List
         A list containing all Detector instances. Detectors should already be fit to the
@@ -108,12 +136,12 @@ def plot_corr_matrix(corr_matrix: np.ndarray,
     # Loop over data dimensions and create text annotations.
     for i in range(len(det_list)):
         for j in range(len(det_list)):
-            if round(float(corr_matrix[i, j]),3) > 0.5:
+            if round(float(corr_matrix[i, j]), 3) > 0.5:
                 color = 'k'
             else:
                 color = 'w'
-            text = ax.text(j, i, round(float(corr_matrix[i, j]),3),
-                        ha="center", va="center", color=color)
+            ax.text(j, i, round(float(corr_matrix[i, j]), 3),
+                    ha="center", va="center", color=color)
 
     # Generates colorbar
     cbar = ax.figure.colorbar(im, ax=ax)
